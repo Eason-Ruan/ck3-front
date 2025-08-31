@@ -11,6 +11,9 @@ class FloatingWindow {
             collapsible: options.collapsible !== false,
             draggable: options.draggable !== false,
             className: options.className || '',
+            // inline 渲染支持
+            inline: options.inline === true,
+            mountContainer: options.mountContainer || null,
             // 聊天配置
             apiEndpoint: options.apiEndpoint || '/api/chat',
             apiMethod: options.apiMethod || 'POST',
@@ -32,6 +35,9 @@ class FloatingWindow {
   
         this.element = document.createElement('div');
         this.element.className = `floating-window ${this.options.className}`;
+        if (this.options.inline) {
+            this.element.classList.add('inline');
+        }
         
         // 浮窗结构
         this.element.innerHTML = `
@@ -135,11 +141,19 @@ class FloatingWindow {
         this.panelTitle = this.element.querySelector('.panel-title');
         
         // 初始样式
-        if (this.options.width !== 320) {
-            this.element.style.width = this.options.width + 'px';
+        if (this.options.width !== 320 && this.options.width !== undefined && this.options.width !== null) {
+            if (typeof this.options.width === 'number') {
+                this.element.style.width = this.options.width + 'px';
+            } else if (typeof this.options.width === 'string') {
+                this.element.style.width = this.options.width;
+            }
         }
         if (this.options.height && this.options.height !== 'auto') {
-            this.element.style.height = this.options.height + 'px';
+            if (typeof this.options.height === 'number') {
+                this.element.style.height = this.options.height + 'px';
+            } else if (typeof this.options.height === 'string') {
+                this.element.style.height = this.options.height;
+            }
         }
         
         // 初始位置
@@ -153,12 +167,23 @@ class FloatingWindow {
             this.content.appendChild(this.options.content);
         }
         
-        document.body.appendChild(this.element);
+        let mountTarget = document.body;
+        if (this.options.mountContainer) {
+            mountTarget = typeof this.options.mountContainer === 'string'
+                ? document.querySelector(this.options.mountContainer)
+                : this.options.mountContainer;
+            if (!mountTarget) {
+                // fallback
+                mountTarget = document.body;
+            }
+        }
+        mountTarget.appendChild(this.element);
     }
     
     init() {
     
-        if (this.options.draggable) {
+        // inline 模式默认禁用拖拽
+        if (this.options.draggable && !this.options.inline) {
             this.bindDragEvents();
         }
         
@@ -994,7 +1019,7 @@ window.FloatingWindow = FloatingWindow;
 
 
 window.createDemoFloatingWindow = function() {
-    return FloatingWindow.create({
+    const defaultOptions = {
         title: 'CK3 AI assistant',
         content: `
             <div class="chat-container">
@@ -1040,7 +1065,10 @@ window.createDemoFloatingWindow = function() {
             console.error('chat:', error);
             return `connection error: ${error.message}`; // 返回错误消息
         }
-    });
+    };
+    // 允许外部传入覆盖选项：createDemoFloatingWindow(opts)
+    const overrides = (arguments && arguments[0]) ? arguments[0] : {};
+    return FloatingWindow.create({ ...defaultOptions, ...overrides });
 };
 
 

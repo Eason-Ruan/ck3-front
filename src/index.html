@@ -10,8 +10,44 @@
     <script src="./floating-window.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // 改为直接在页面内渲染聊天区域，而不是创建二级浮窗
-            window.renderChatInline(document.body);
+            // 使用 FloatingWindow 的 inline 模式直接挂载到页面
+            window.FloatingWindow.create({
+                inline: true,
+                mountContainer: document.body,
+                width: '100%',
+                height: '100vh',
+                draggable: false,
+                x: null,
+                y: null,
+                title: 'CK3 AI assistant',
+                content: `
+                    <div class="chat-container">
+                        <div class="chat-messages" id="chatMessages">
+                            <div class="message assistant-message">
+                                <div class="message-content">
+                                    <strong>CK3 AI assistant:</strong> Please enter your message...
+                                </div>
+                            </div>
+                        </div>
+                        <div class="chat-input-container">
+                            <div class="input-wrapper">
+                                <input type="text" id="chatInput" placeholder="Please enter your message..." class="chat-input" />
+                                <button id="sendButton" class="send-button">send</button>
+                            </div>
+                        </div>
+                    </div>
+                `,
+                onMessageSend: async function(message) {
+                    await new Promise(r => setTimeout(r, 400));
+                    return `echo: ${message}`;
+                },
+                onMessageReceive: function(data) {
+                    return data.reply || data.message;
+                },
+                onError: function(error) {
+                    return `connection error: ${error.message}`;
+                }
+            });
         });
     </script>
 </body>

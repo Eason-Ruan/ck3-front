@@ -1289,3 +1289,50 @@ body.dragging {
 .typing-dots {
     font-style: italic;
 }
+
+/* inline 模式覆盖：直接在页面内渲染，而非悬浮窗口 */
+.floating-window.inline {
+    position: relative;
+    top: auto;
+    right: auto;
+    left: auto;
+    width: 100%;
+    max-width: none;
+    height: 100vh;
+    min-height: 100vh;
+    margin: 0;
+    z-index: auto;
+    box-shadow: none;
+    border-radius: 0;
+    background: rgba(255, 255, 255, 0.95);
+    border: none;
+    display: flex;
+    flex-direction: column;
+}
+
+.floating-window.inline .floating-window-header {
+    cursor: default;
+}
+
+.floating-window.inline .chat-container {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    flex: 1;
+}
+
+.floating-window.inline .chat-messages {
+    max-height: none;
+    flex: 1;
+}
+
+/* 让根文档撑满视口，并移除默认外边距 */
+html, body {
+    height: 100%;
+    margin: 0;
+}
+
+.floating-window.inline .floating-window-content {
+    display: flex;
+    flex: 1;
+}

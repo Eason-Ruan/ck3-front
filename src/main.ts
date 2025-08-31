@@ -3,7 +3,7 @@ import path from 'node:path';
 
 function createMainWindow(): void {
   const mainWindow = new BrowserWindow({
-    width: 1000,
+    width: 800,
     height: 700,
     frame: false,
     fullscreen: false,
