@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>浮窗</title>
+    <link rel="stylesheet" href="./floating-window.css">
+</head>
+<body>
+    <script src="./floating-window.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 改为直接在页面内渲染聊天区域，而不是创建二级浮窗
+            window.renderChatInline(document.body);
+        });
+    </script>
+</body>
+</html>
+
