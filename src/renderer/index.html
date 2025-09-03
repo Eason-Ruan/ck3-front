@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>浮窗</title>
+    <link rel="stylesheet" href="../floating-window.css">
+    <script>
+        // 仅用于确认 preload 是否注入（可选）
+        window.addEventListener('DOMContentLoaded', () => {
+            if (window.electronAPI) {
+                console.log('preload injected:', window.electronAPI.platform);
+            }
+        });
+    </script>
+    
+</head>
+<body>
+    <script src="../floating-window.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 使用 FloatingWindow 的 inline 模式直接挂载到页面
+            const fw = window.FloatingWindow.create({
+                inline: true,
+                mountContainer: document.body,
+                width: '100%',
+                height: '100vh',
+                draggable: false,
+                x: null,
+                y: null,
+                title: 'CK3 AI assistant',
+                content: `
+                    <div class="chat-container">
+                        <div class="chat-messages" id="chatMessages">
+                            <div class="message assistant-message">
+                                <div class="message-content">
+                                    <strong>CK3 AI assistant:</strong> Please enter your message...
+                                </div>
+                            </div>
+                        </div>
+                        <div class="chat-input-container">
+                            <div class="input-wrapper">
+                                <input type="text" id="chatInput" placeholder="Please enter your message..." class="chat-input" />
+                                <button id="sendButton" class="send-button">send</button>
+                            </div>
+                        </div>
+                    </div>
+                `,
+                onMessageSend: async function(message) {
+                    try {
+                        const sessionId = (fw && fw.currentConversationId) ? fw.currentConversationId : 'default';
+                        if (!window.electronAPI?.chat) return 'IPC not available';
+                        // 针对每个会话仅初始化一次
+                        if (!window.__ck3_session_inited) window.__ck3_session_inited = {};
+                        if (!window.__ck3_session_inited[sessionId]) {
+                            await window.electronAPI.chat.newSession(sessionId);
+                            window.__ck3_session_inited[sessionId] = true;
+                        }
+                        const { reply } = await window.electronAPI.chat.send(sessionId, message);
+                        return reply || '(no reply)';
+                    } catch (err) {
+                        return `IPC error: ${err?.message || err}`;
+                    }
+                },
+                onMessageReceive: function(data) {
+                    return data.reply || data.message;
+                },
+                onError: function(error) {
+                    return `connection error: ${error.message}`;
+                }
+            });
+        });
+    </script>
+</body>
+</html>
+
+

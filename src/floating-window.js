@@ -27,6 +27,12 @@ class FloatingWindow {
         this.isDragging = false;
         this.dragOffset = { x: 0, y: 0 };
         
+        // 会话相关状态
+        this.conversations = {};
+        this.currentConversationId = null;
+        this.conversationAutoInc = 1;
+        this.currentConversationItemForMenu = null;
+        
         this.createElement();
         this.init();
     }
@@ -84,32 +90,10 @@ class FloatingWindow {
                                 </span>
                             </div>
                         </div>
-                        <div class="sidebar-menu-bottom">
-                            <div id="menu-setting" class="menu-item-bottom">
-                                <span class="flex-center-gap">
-                                    <span class="svg-icon svg-icon-settings"></span>
-                                    <span>Setting</span>
-                                </span>
-                            </div>
-                        </div>
+                        
                     </div>
                 </div>
-                <div class="right-panel">
-                    <div class="panel-header">
-                        <h4 class="panel-title">details</h4>
-                        <button class="close-panel-btn" title="close">&times;</button>
-                    </div>
-                    <div class="panel-content">
-                        <div id="setting-content" class="panel-page">
-                            <h5>settings</h5>
-                            <p>coming...</p>
-                        </div>
-                        <div id="history-content" class="panel-page">
-                            <h5>history</h5>
-                            <p>coming...</p>
-                        </div>
-                    </div>
-                </div>
+                
                 <!-- Conversation Menu Popup -->
                 <div class="conversation-menu-popup" id="conversationMenuPopup">
                     <div class="menu-popup-item" data-action="edit">
@@ -136,9 +120,7 @@ class FloatingWindow {
         this.menuBtn = this.element.querySelector('.menu-btn');
         this.sidebar = this.element.querySelector('.floating-window-sidebar');
         this.closeSidebarBtn = this.element.querySelector('.close-sidebar-btn');
-        this.rightPanel = this.element.querySelector('.right-panel');
-        this.closePanelBtn = this.element.querySelector('.close-panel-btn');
-        this.panelTitle = this.element.querySelector('.panel-title');
+        
         
         // 初始样式
         if (this.options.width !== 320 && this.options.width !== undefined && this.options.width !== null) {
@@ -196,7 +178,128 @@ class FloatingWindow {
         
         this.bindChatEvents();
         
+        // 初始化默认会话
+        this.ensureDefaultConversation();
+        
         this.show();
+    }
+    
+    // —— 会话：创建/选择/渲染 ——
+    ensureDefaultConversation() {
+        const conversationList = this.element.querySelector('#conversationList');
+        if (conversationList) {
+            conversationList.innerHTML = '';
+        }
+        if (!this.currentConversationId) {
+            this.createNewConversation();
+        }
+    }
+    
+    generateConversationId() {
+        const id = 'conversation-' + this.conversationAutoInc;
+        this.conversationAutoInc += 1;
+        return id;
+    }
+    
+    createNewConversation() {
+        const id = this.generateConversationId();
+        const title = 'Conversation ' + id.split('-').pop();
+        this.conversations[id] = { id, title, messages: [] };
+        this.appendConversationListItem(this.conversations[id]);
+        this.selectConversation(id);
+    }
+    
+    appendConversationListItem(conversation) {
+        const conversationList = this.element.querySelector('#conversationList');
+        if (!conversationList) return;
+        
+        const item = document.createElement('div');
+        item.id = conversation.id;
+        item.className = 'conversation-item';
+        item.innerHTML = `
+            <span class="flex-between">
+                <span class="conversation-title">${conversation.title}</span>
+                <button class="conversation-menu-btn">
+                    <span class="three-dots"></span>
+                </button>
+            </span>
+        `;
+        
+        const titleWrapper = item.querySelector('.conversation-title');
+        if (titleWrapper) {
+            titleWrapper.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.selectConversation(conversation.id);
+            });
+        }
+        
+        const menuBtn = item.querySelector('.conversation-menu-btn');
+        const menuPopup = this.element.querySelector('#conversationMenuPopup');
+        if (menuBtn && menuPopup) {
+            menuBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.currentConversationItemForMenu = item;
+                if (menuPopup.classList.contains('visible')) {
+                    this.hideConversationMenu(menuPopup);
+                } else {
+                    this.showConversationMenu(menuBtn, menuPopup);
+                }
+            });
+        }
+        
+        conversationList.appendChild(item);
+    }
+    
+    selectConversation(conversationId) {
+        if (!this.conversations[conversationId]) return;
+        this.currentConversationId = conversationId;
+        
+        const conversationItems = this.element.querySelectorAll('.conversation-item');
+        conversationItems.forEach(node => node.classList.remove('active'));
+        const currentItem = this.element.querySelector(`#${conversationId}`);
+        if (currentItem) currentItem.classList.add('active');
+        
+        this.renderChatFromConversation();
+    }
+    
+    saveMessageToCurrentConversation(role, content) {
+        if (!this.currentConversationId || !this.conversations[this.currentConversationId]) return;
+        this.conversations[this.currentConversationId].messages.push({ role, content, timestamp: Date.now() });
+    }
+    
+    renderChatFromConversation() {
+        const chatMessages = this.element.querySelector('#chatMessages');
+        if (!chatMessages) return;
+        chatMessages.innerHTML = '';
+        const current = this.conversations[this.currentConversationId];
+        if (!current) return;
+        current.messages.forEach(m => {
+            this.addMessage(chatMessages, m.content, m.role === 'user' ? 'user' : (m.role === 'assistant' ? 'assistant' : 'error'));
+        });
+    }
+    
+    updateHistoryPanel() {
+        const historyContent = this.element.querySelector('#history-content');
+        if (!historyContent) return;
+        const current = this.currentConversationId ? this.conversations[this.currentConversationId] : null;
+        const idText = current ? current.id : 'N/A';
+        const msgs = current ? current.messages : [];
+        const list = msgs.map(m => `<div class="history-row"><span class="history-role">${m.role}</span>: <span class="history-text">${this.escapeHtml(m.content)}</span></div>`).join('');
+        historyContent.innerHTML = `
+            <h5>history</h5>
+            <div class="history-meta">conversation id: <code>${idText}</code></div>
+            <div class="history-list">${list || '<div class="history-empty">(empty)</div>'}</div>
+        `;
+    }
+    
+    escapeHtml(text) {
+        if (text == null) return '';
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
     }
     
     bindChatEvents() {
@@ -226,6 +329,7 @@ class FloatingWindow {
         if (!message) return;
         
         this.addMessage(messagesContainer, message, 'user');
+        this.saveMessageToCurrentConversation('user', message);
         
         inputElement.value = '';
         
@@ -244,6 +348,7 @@ class FloatingWindow {
                 if (result) {
                     this.removeTypingIndicator(messagesContainer);
                     this.addMessage(messagesContainer, result, 'assistant');
+                    this.saveMessageToCurrentConversation('assistant', result);
                     return;
                 }
             }
@@ -273,6 +378,7 @@ class FloatingWindow {
                 const processedReply = this.options.onMessageReceive(data);
                 if (processedReply) {
                     this.addMessage(messagesContainer, processedReply, 'assistant');
+                    this.saveMessageToCurrentConversation('assistant', processedReply);
                     return;
                 }
             }
@@ -280,8 +386,10 @@ class FloatingWindow {
             // 服务器回复
             if (data.reply) {
                 this.addMessage(messagesContainer, data.reply, 'assistant');
+                this.saveMessageToCurrentConversation('assistant', data.reply);
             } else if (data.message) {
                 this.addMessage(messagesContainer, data.message, 'assistant');
+                this.saveMessageToCurrentConversation('assistant', data.message);
             }
             
         } catch (error) {
@@ -294,12 +402,14 @@ class FloatingWindow {
                 const errorMessage = this.options.onError(error);
                 if (errorMessage) {
                     this.addMessage(messagesContainer, errorMessage, 'error');
+                    this.saveMessageToCurrentConversation('error', errorMessage);
                     return;
                 }
             }
             
             // 默认错误消息
             this.addMessage(messagesContainer, 'fail to connect to server', 'error');
+            this.saveMessageToCurrentConversation('error', 'fail to connect to server');
         }
     }
     
@@ -365,38 +475,14 @@ class FloatingWindow {
             });
         }
         
-        if (this.closePanelBtn) {
-            this.closePanelBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.closeRightPanel();
-            });
-        }
         
-        //setting
-        const settingBtn = this.element.querySelector('#menu-setting');
-        if (settingBtn) {
-            settingBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.showRightPanel('setting');
-            });
-        }
-        
-        const menuItems = this.element.querySelectorAll('.menu-item');
-        menuItems.forEach(item => {
-            item.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const itemId = item.id.replace('menu-', '');
-                this.showRightPanel(itemId);
-            });
-        });
         
         // New Conversation
         const newConversationBtn = this.element.querySelector('#newConversationBtn');
         if (newConversationBtn) {
             newConversationBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                console.log('new chat');
-                // new chat 还没写
+                this.createNewConversation();
             });
         }
         
@@ -411,28 +497,27 @@ class FloatingWindow {
             });
         }
         
-        // conversation
-        const conversationItems = this.element.querySelectorAll('.conversation-item');
-        conversationItems.forEach(item => {
-            const titleWrapper = item.querySelector('span span:first-child');
-            if (titleWrapper) {
-                titleWrapper.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    console.log('choose chat:', titleWrapper.textContent);
-                    // choose chat逻辑还没写
-                });
-            }
-        });
+        // conversation（事件代理：整行可点击）
+        if (conversationList) {
+            conversationList.addEventListener('click', (e) => {
+                // 忽略菜单按钮点击
+                if (e.target.closest('.conversation-menu-btn')) return;
+                const item = e.target.closest('.conversation-item');
+                if (!item || !conversationList.contains(item)) return;
+                const id = item.id;
+                if (id) this.selectConversation(id);
+            });
+        }
 
         // conversation menu
         const conversationMenuBtns = this.element.querySelectorAll('.conversation-menu-btn');
         const menuPopup = this.element.querySelector('#conversationMenuPopup');
-        let currentConversationItem = null;
+        this.currentConversationItemForMenu = null;
 
         conversationMenuBtns.forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                currentConversationItem = btn.closest('.conversation-item');
+                this.currentConversationItemForMenu = btn.closest('.conversation-item');
                 
                 if (menuPopup.classList.contains('visible')) {
                     this.hideConversationMenu(menuPopup);
@@ -448,7 +533,7 @@ class FloatingWindow {
                 item.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const action = item.dataset.action;
-                    this.handleConversationMenuAction(action, currentConversationItem);
+                    this.handleConversationMenuAction(action, this.currentConversationItemForMenu);
                     this.hideConversationMenu(menuPopup);
                 });
             });
@@ -621,6 +706,7 @@ class FloatingWindow {
     handleConversationMenuAction(action, conversationItem) {
         const titleElement = conversationItem.querySelector('span span:first-child');
         const conversationName = titleElement ? titleElement.textContent : 'Unknown';
+        const conversationId = conversationItem ? conversationItem.id : null;
         
         switch (action) {
             case 'delete':
@@ -628,8 +714,20 @@ class FloatingWindow {
                     'Delete Conversation',
                     `Are you sure you want to delete the conversation "${conversationName}"?`,
                     () => {
-                        conversationItem.remove();
-                        console.log('Delete conversation:', conversationName);
+                        if (conversationItem) {
+                            conversationItem.remove();
+                        }
+                        if (conversationId && this.conversations[conversationId]) {
+                            delete this.conversations[conversationId];
+                        }
+                        if (this.currentConversationId === conversationId) {
+                            const remainingIds = Object.keys(this.conversations);
+                            if (remainingIds.length > 0) {
+                                this.selectConversation(remainingIds[0]);
+                            } else {
+                                this.createNewConversation();
+                            }
+                        }
                     },
                     null,
                     'dialog-delete'
@@ -643,7 +741,9 @@ class FloatingWindow {
                     (newTitle) => {
                         if (newTitle && newTitle.trim()) {
                             titleElement.textContent = newTitle.trim();
-                            console.log('Edit title:', conversationName, '=>', newTitle.trim());
+                            if (conversationId && this.conversations[conversationId]) {
+                                this.conversations[conversationId].title = newTitle.trim();
+                            }
                         }
                     },
                     null,
@@ -662,33 +762,7 @@ class FloatingWindow {
         }
     }
     
-    // setting page
-    showRightPanel(contentType) {
-        const allPanels = this.element.querySelectorAll('.panel-page');
-        allPanels.forEach(panel => panel.classList.add('display-none'));
-        
-        const targetPanel = this.element.querySelector(`#${contentType}-content`);
-        if (targetPanel) {
-            targetPanel.classList.remove('display-none');
-            targetPanel.classList.add('display-block');
-        }
-        
-        const titles = {
-            'setting': 'setting'
-        };
-        if (this.panelTitle) {
-            this.panelTitle.textContent = titles[contentType] || 'details';
-        }
-        
-        this.element.classList.add('panel-open');
-    }
-    
-    closeRightPanel() {
-        this.element.classList.remove('panel-open');
-        
-        const allPanels = this.element.querySelectorAll('.panel-page');
-        allPanels.forEach(panel => panel.classList.add('display-none'));
-    }
+    // 已移除 detail 面板
     
     // drag
     startDrag(e) {

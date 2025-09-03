@@ -2,17 +2,26 @@
   "name": "ck3-front",
   "version": "1.0.0",
   "description": "",
-  "main": "dist/main.js",
+  "main": "dist/main/main.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && npm run copy:renderer",
+    "copy:renderer": "mkdir -p dist/renderer && cp -f src/renderer/index.html dist/renderer/index.html && cp -f src/floating-window.css dist/floating-window.css && cp -f src/floating-window.js dist/floating-window.js",
     "start": "npm run build && electron .",
-    "dev": "tsc -w & electron ."
+    "dev": "npm run copy:renderer && tsc -w & electron ."
   },
-  "dependencies": {},
+  "dependencies": {
+    "@langchain/core": "^0.3.72",
+    "@langchain/langgraph": "^0.4.8",
+    "@langchain/openai": "^0.6.9",
+    "@openai/agents": "^0.1.0",
+    "langchain": "^0.3.31",
+    "openai": "^5.16.0",
+    "zod": "^3.25.76"
+  },
   "devDependencies": {
-    "typescript": "^5.5.3",
+    "@types/node": "^20.0.0",
     "electron": "^30.0.0",
-    "@types/node": "^20.0.0"
+    "typescript": "^5.5.3"
   },
   "private": true
 }
