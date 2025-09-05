@@ -114,13 +114,21 @@ export function buildGraph(env: AppEnv) {
                 
                 console.log(`[data_loader] 调用数据加载器, 消息数量: ${messages.length}`);
                 const msg = await dataLoader.invoke(messages);
-                console.log(`[data_loader] 数据加载器响应:`, { type: msg?._getType?.(), hasToolCalls: !!(msg as any)?.tool_calls?.length });
-                try {
-                    const c = (msg as any)?.content;
-                    const text = typeof c === 'string' ? c : (Array.isArray(c) ? c.map((x: any) => (x?.text || x?.content || '')).join('\n') : (typeof c === 'object' ? JSON.stringify(c) : String(c)));
-                    console.log(`[data_loader] 输出消息 len=${text?.length || 0}`);
-                } catch {}
-                
+
+                const loops = (state.scratch?.dataloaderToolLoops ?? 0) + ((msg as any)?.tool_calls?.length ? 1 : 0);
+                const newScratch = { ...(state.scratch || {}), lastToolCaller: "data_loader", dataloaderToolLoops: loops };
+                const hardLimit = 6;
+
+                if (loops > hardLimit) {
+                return {
+                    messages: [new AIMessage({
+                    name: "data_loader",
+                    content: "工具调用已达上限，改为输出当前已知的结构化总结。" as any
+                    })],
+                    scratch: newScratch
+                };
+                }
+
                 return { messages: [msg], scratch: { ...(state.scratch || {}), lastToolCaller: "data_loader" } };
             } catch (error: any) {
                 console.error(`[data_loader] 错误:`, error);

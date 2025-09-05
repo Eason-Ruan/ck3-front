@@ -539,6 +539,7 @@ body {
     display: flex;
     flex-direction: column;
     height: 320px;
+    overflow-y: auto;
 }
 
 .chat-messages {
@@ -990,6 +991,7 @@ body {
     display: flex;
     align-items: center;
     padding: 8px 0;
+    overflow: auto;
 }
 
 .message-indicator {
@@ -1326,13 +1328,14 @@ body.dragging {
     flex-direction: column;
     height: auto;
     flex: 1;
+    overflow: auto;
 }
 
 .floating-window.inline .chat-messages {
     max-height: none;
     flex: 1;
     /* 允许上下滚动 */
-    overflow-y: auto;
+    overflow: auto;
 }
 
 /* 让根文档撑满视口，并移除默认外边距 */
