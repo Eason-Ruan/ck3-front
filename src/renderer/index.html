@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>浮窗</title>
+    <title>聊天</title>
     <link rel="stylesheet" href="../floating-window.css">
     <script>
         // 仅用于确认 preload 是否注入（可选）
@@ -28,20 +28,20 @@
                 draggable: false,
                 x: null,
                 y: null,
-                title: 'CK3 AI assistant',
+                title: 'CK3 助手',
                 content: `
                     <div class="chat-container">
                         <div class="chat-messages" id="chatMessages">
                             <div class="message assistant-message">
                                 <div class="message-content">
-                                    <strong>CK3 AI assistant:</strong> Please enter your message...
+                                    <strong>CK3 助手:</strong> 请输入你的问题...
                                 </div>
                             </div>
                         </div>
                         <div class="chat-input-container">
                             <div class="input-wrapper">
-                                <input type="text" id="chatInput" placeholder="Please enter your message..." class="chat-input" />
-                                <button id="sendButton" class="send-button">send</button>
+                                <input type="text" id="chatInput" placeholder="请输入消息..." class="chat-input" />
+                                <button id="sendButton" class="send-button">发送</button>
                             </div>
                         </div>
                     </div>
@@ -57,16 +57,32 @@
                             window.__ck3_session_inited[sessionId] = true;
                         }
                         const { reply } = await window.electronAPI.chat.send(sessionId, message);
-                        return reply || '(no reply)';
+                        // 支持JSON字符串或对象的安全解析，优先中文
+                        try {
+                            const parsed = typeof reply === 'string' ? JSON.parse(reply) : reply;
+                            if (parsed && typeof parsed === 'object') {
+                                const text = parsed.text || parsed.reply || parsed.message || '';
+                                return text || JSON.stringify(parsed, null, 2);
+                            }
+                        } catch {}
+                        return reply || '(无回复)';
                     } catch (err) {
-                        return `IPC error: ${err?.message || err}`;
+                        return `IPC 错误: ${err?.message || err}`;
                     }
                 },
                 onMessageReceive: function(data) {
+                    if (!data) return '';
+                    if (typeof data === 'string') {
+                        try {
+                            const obj = JSON.parse(data);
+                            return obj.reply || obj.message || data;
+                        } catch {}
+                        return data;
+                    }
                     return data.reply || data.message;
                 },
                 onError: function(error) {
-                    return `connection error: ${error.message}`;
+                    return `连接错误: ${error.message}`;
                 }
             });
         });

@@ -565,6 +565,9 @@ body {
     border-radius: 8px;
     line-height: 1.4;
     font-size: 14px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .user-message .message-content {
@@ -1304,10 +1307,14 @@ body.dragging {
     z-index: auto;
     box-shadow: none;
     border-radius: 0;
-    background: rgba(255, 255, 255, 0.95);
+    /* 半透明白色背景 */
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     border: none;
     display: flex;
     flex-direction: column;
+    color: #000000;
 }
 
 .floating-window.inline .floating-window-header {
@@ -1324,6 +1331,8 @@ body.dragging {
 .floating-window.inline .chat-messages {
     max-height: none;
     flex: 1;
+    /* 允许上下滚动 */
+    overflow-y: auto;
 }
 
 /* 让根文档撑满视口，并移除默认外边距 */
@@ -1335,4 +1344,41 @@ html, body {
 .floating-window.inline .floating-window-content {
     display: flex;
     flex: 1;
+}
+
+/* 覆盖为黑色文字与浅色气泡 */
+.floating-window.inline .floating-window-header {
+    background-color: rgba(255, 255, 255, 0.4);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+.floating-window.inline .floating-window-title {
+    color: #000000;
+    text-shadow: none;
+}
+.floating-window.inline .message-content {
+    background-color: rgba(255, 255, 255, 0.75);
+    color: #000000;
+}
+.floating-window.inline .user-message .message-content {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+.floating-window.inline .assistant-message .message-content {
+    background-color: rgba(255, 255, 255, 0.85);
+}
+.floating-window.inline .chat-input {
+    background-color: rgba(255, 255, 255, 0.85);
+    color: #000000;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+}
+.floating-window.inline .chat-input::placeholder {
+    color: rgba(0, 0, 0, 0.45);
+}
+.floating-window.inline .send-button {
+    background-color: #000000;
+    border-color: #000000;
+    color: #ffffff;
+}
+.floating-window.inline .floating-window-content {
+    color: #000000;
+    text-shadow: none;
 }
