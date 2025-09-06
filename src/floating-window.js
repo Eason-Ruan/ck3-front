@@ -178,6 +178,11 @@ class FloatingWindow {
         
         this.bindChatEvents();
         
+        // 绑定模式切换
+        this.bindModeToggleEvents();
+        // 绑定 RAG_TIER 切换
+        this.bindTierToggleEvents();
+        
         // 初始化默认会话
         this.ensureDefaultConversation();
         
@@ -306,22 +311,89 @@ class FloatingWindow {
 
         setTimeout(() => {
             const chatInput = this.element.querySelector('#chatInput');
+            const fixedText = this.element.querySelector('#fixedText');
             const sendButton = this.element.querySelector('#sendButton');
             const chatMessages = this.element.querySelector('#chatMessages');
             
-            if (chatInput && sendButton && chatMessages) {
-                // send
+            if (sendButton && chatMessages) {
                 sendButton.addEventListener('click', () => {
-                    this.sendMessage(chatInput, chatMessages);
-                });
-                
-                chatInput.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') {
+                    if (fixedText) {
+                        this.sendFixedMessage(fixedText.textContent || '', chatMessages);
+                    } else if (chatInput) {
                         this.sendMessage(chatInput, chatMessages);
                     }
                 });
             }
         }, 100);
+    }
+
+    // —— 模式选择 ——
+    bindModeToggleEvents() {
+        // 默认模式
+        this.replyMode = 'BOTH';
+        const btnBoth = this.element.querySelector('#modeBoth');
+        const btnData = this.element.querySelector('#modeData');
+        const btnSugg = this.element.querySelector('#modeSuggestion');
+        const buttons = [btnBoth, btnData, btnSugg].filter(Boolean);
+        const setActive = (activeBtn) => {
+            buttons.forEach((b) => b.classList.remove('active'));
+            buttons.forEach((b) => b.setAttribute('aria-pressed', 'false'));
+            if (activeBtn) {
+                activeBtn.classList.add('active');
+                activeBtn.setAttribute('aria-pressed', 'true');
+            }
+        };
+        if (btnBoth) {
+            btnBoth.addEventListener('click', () => {
+                this.replyMode = 'BOTH';
+                setActive(btnBoth);
+            });
+            // 默认激活 BOTH
+            setActive(btnBoth);
+        }
+        if (btnData) {
+            btnData.addEventListener('click', () => {
+                this.replyMode = 'DATA';
+                setActive(btnData);
+            });
+        }
+        if (btnSugg) {
+            btnSugg.addEventListener('click', () => {
+                this.replyMode = 'SUGGESTION';
+                setActive(btnSugg);
+            });
+        }
+    }
+
+    getReplyMode() {
+        return this.replyMode || 'BOTH';
+    }
+
+    // —— TIER 选择 ——
+    bindTierToggleEvents() {
+        this.replyTier = undefined;
+        const t1 = this.element.querySelector('#tier1');
+        const t2 = this.element.querySelector('#tier2');
+        const t3 = this.element.querySelector('#tier3');
+        const t4 = this.element.querySelector('#tier4');
+        const buttons = [t1, t2, t3, t4].filter(Boolean);
+        const setActive = (activeBtn) => {
+            buttons.forEach((b) => b.classList.remove('active'));
+            buttons.forEach((b) => b.setAttribute('aria-pressed', 'false'));
+            if (activeBtn) {
+                activeBtn.classList.add('active');
+                activeBtn.setAttribute('aria-pressed', 'true');
+            }
+        };
+        if (t1) t1.addEventListener('click', () => { this.replyTier = '1'; setActive(t1); });
+        if (t2) t2.addEventListener('click', () => { this.replyTier = '2'; setActive(t2); });
+        if (t3) t3.addEventListener('click', () => { this.replyTier = '3'; setActive(t3); });
+        if (t4) t4.addEventListener('click', () => { this.replyTier = '4'; setActive(t4); });
+        // 初始不选中任何 tier，若需要默认 tier 可在此设置
+    }
+
+    getReplyTier() {
+        return this.replyTier;
     }
     
     sendMessage(inputElement, messagesContainer) {
@@ -337,6 +409,15 @@ class FloatingWindow {
         
         // 调用发送消息接口
         this.sendToServer(message, messagesContainer);
+    }
+
+    sendFixedMessage(message, messagesContainer) {
+        const text = String(message || '').trim();
+        if (!text) return;
+        this.addMessage(messagesContainer, text, 'user');
+        this.saveMessageToCurrentConversation('user', text);
+        this.showTypingIndicator(messagesContainer);
+        this.sendToServer(text, messagesContainer);
     }
     
     // 发送消息到服务器的接口

@@ -1,10 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
-import { buildGraph } from './graph';
 import { loadEnv } from './config';
-import { GraphState } from './state';
-import { HumanMessage, AIMessage } from '@langchain/core/messages';
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -83,7 +80,6 @@ app.whenReady().then(() => {
   createMainWindow();
 
   // —— 简单的会话状态：sessionId -> GraphState ——
-  const sessions = new Map<string, GraphState>();
   const env = loadEnv(process.env);
   // —— 设置/校验 Agent 所需的 Keys ——
   // 优先使用现有环境变量；其次使用经过 Schema 校验后的 env 值
@@ -126,75 +122,339 @@ app.whenReady().then(() => {
     process.env.CSV_BASE_DIR = dataDir;
     console.log(`[CSV] CSV_BASE_DIR=${process.env.CSV_BASE_DIR}`);
   }
-  const graph = buildGraph(env);
+  // 不再构建/调用外部 agent/graph，改为本地占位实现
 
-  ipcMain.handle('chat:newSession', async (_event, { sessionId }: { sessionId: string }) => {
-    sessions.set(sessionId, { messages: [], next: 'router', scratch: {} } as GraphState);
+  ipcMain.handle('chat:newSession', async () => {
     return { ok: true };
   });
 
-  ipcMain.handle('chat:send', async (_event, { sessionId, text }: { sessionId: string; text: string }) => {
+  ipcMain.handle('chat:send', async (_event, { text, mode, tier: tierInput }: { text: string, mode?: 'BOTH' | 'DATA' | 'SUGGESTION', tier?: '1' | '2' | '3' | '4' }) => {
     try {
-      console.log(`[chat:send] 开始处理会话 ${sessionId}, 消息: ${text}`);
-      
-      const prev = sessions.get(sessionId) || ({ messages: [], next: 'router', scratch: {} } as GraphState);
-      console.log(`[chat:send] 上一状态:`, { 
-        messagesCount: prev.messages?.length || 0, 
-        next: prev.next, 
-        scratchKeys: Object.keys(prev.scratch || {}) 
-      });
-      
-      const prevMessages = prev.messages || [];
-      const withUser: GraphState = {
-        ...prev,
-        messages: [...prevMessages, new HumanMessage(text)]
-      };
-      
-      console.log(`[chat:send] 准备调用图执行, 消息数量: ${withUser.messages.length}`);
-      const result: GraphState = await (graph as any).invoke(withUser);
-      console.log(`[chat:send] 图执行完成, 结果消息数量: ${result.messages?.length || 0}`);
+      // 优先使用页面传入的 mode，其次使用环境变量
+      const modeFromEnv = env.INFO_MODE;
+      const modeValue = (mode || modeFromEnv) as any;
+      const tier = (tierInput || env.RAG_TIER) as any;
+      const delay = 2000 + Math.floor(Math.random() * 2000);
+      await new Promise((r) => setTimeout(r, delay));
 
-      // —— 打印本轮会话中的所有消息（包含类型、名称、内容与工具调用）——
-      try {
-        const all = result.messages || [];
-        console.log(`[chat:send] —— 本轮所有消息（${all.length}）——`);
-        all.forEach((m: any, idx: number) => {
-          const type = m?._getType?.();
-          const name = (m as any)?.name;
-          const contentText = extractTextFromContent((m as any)?.content);
-          const hasToolCalls = Array.isArray((m as any)?.tool_calls) && (m as any).tool_calls.length > 0;
-          console.log(`[chat:send] [${idx}] type=${type} name=${name || '-'} len=${contentText?.length || 0} toolCalls=${hasToolCalls}`);
-          if (hasToolCalls) {
-            console.log(`[chat:send] [${idx}] tool_calls:`, (m as any).tool_calls);
-          }
-          console.log(`[chat:send] [${idx}] content:\n${contentText}`);
-        });
-      } catch (e: any) {
-        console.warn(`[chat:send] 打印消息失败: ${e?.message || String(e)}`);
+      // 8 个占位文本（内容留空）
+      const TEXT_1_BOTH = `推荐的最优选择：**隆佛特市长**
+理由：他没有伯爵领，分封后可直接提升为伯爵，忠诚度将显著提高，同时其当前兵力较低，成为伯爵后难以对国王构成威胁，是最稳妥的封臣扩张对象。
+
+---
+
+### 候选封臣
+
+**隆佛特市长**
+
+* 好感度：37
+* 拥有的伯爵领数量：0
+* 兵力：69
+* 信仰：海岛基督教
+* 文化：爱尔兰
+* 特质：无领地的小封臣，分封后获得巨大好感提升，实力有限，易于控制。
+
+**卡里格阿尔格什市长**
+
+* 好感度：27
+* 拥有的伯爵领数量：0
+* 兵力：46
+* 信仰：海岛基督教
+* 文化：爱尔兰
+* 特质：与隆佛特类似，弱小且无伯爵领，是可行的受封人选，但好感度偏低。
+
+**奥里尔伯爵**
+
+* 好感度：78
+* 拥有的伯爵领数量：1
+* 兵力：151
+* 信仰：海岛基督教
+* 文化：爱尔兰
+* 特质：属于同一家族，好感基础高，增强亲族封臣的地位有利于内部团结，但已有伯爵领，长期可能变强。
+
+**都夫林伯爵**
+
+* 好感度：71
+* 拥有的伯爵领数量：1
+* 兵力：781
+* 信仰：天主教
+* 文化：爱尔兰
+* 特质：强力封臣，当前好感较高，封地增益会进一步稳固关系，但增强其兵力可能导致未来难以压制。
+
+---
+
+### 决策理由
+
+最优选择是隆佛特市长，因为他弱小无地，分封后获得巨大好感提升，几乎没有威胁，是最佳的“奖励”人选。其他候选如卡里格阿尔格什市长同样合适，但好感稍差；奥里尔伯爵因家族关系可考虑；都夫林伯爵实力过强，虽然稳固短期局势，但有长期隐患。`;
+      const TEXT_2_BOTH = `把新的直属伯爵领分封给**威斯特摩兰伯爵**。
+理由：他和你同一家族，忠诚度最高，已经有一定地位但权力不算过大。分封能进一步稳固宗族内部关系，减少潜在内乱的风险。
+
+---
+
+### 候选封臣信息
+
+**威斯特摩兰伯爵**
+
+* 好感度：80
+* 同一家族：是
+* 现有伯爵领：1
+* 兵力：98
+* 信仰文化：阿萨神族、诺斯
+* 亮点：忠诚度高且属于家族，最稳妥的分封对象
+
+**蒂维厄特河谷伯爵**
+
+* 好感度：70
+* 同一家族：否
+* 现有伯爵领：2
+* 兵力：155
+* 亮点：对你态度不错，但已有两块伯爵领，再分封可能导致权力过盛
+
+**默恩伯爵**
+
+* 好感度：65
+* 同一家族：否
+* 现有伯爵领：1
+* 兵力：254
+* 亮点：兵力强大，拉拢后能增强你的军事力量，但过于强势可能日后难以制衡
+
+**东赖丁伯爵**
+
+* 好感度：25
+* 同一家族：否
+* 现有伯爵领：1
+* 兵力：234
+* 亮点：兵力强大，分封可显著提升好感度，但目前态度偏冷淡，存在风险`;
+      const TEXT_3_BOTH = `**推荐分封对象：代根多夫市长**
+理由：他目前没有伯爵领，若分封会直接升格为伯爵，对好感提升极大；他兵力较低，不会形成威胁；信仰和文化与你一致，治理容易。
+
+---
+
+### 其他较优候选人
+
+**弗赖辛市长**
+
+* 好感度高达85，容易转化为忠诚伯爵
+* 无伯爵领，分封效用最大
+* 但文化为法兰克尼亚，可能导致轻微的文化摩擦
+
+**因斯布鲁克伯爵**
+
+* 好感度极高，已接近满值
+* 已有1块伯爵领，若再授予容易变得过强
+* 文化相同，整合顺畅，但风险在于强势贵族
+
+**弗龙滕豪森伯爵**
+
+* 属于你的家族，忠诚度较稳固
+* 好感度不错，分封能进一步巩固宗族势力
+* 已有伯爵领，强化他会让家族内部一支势力膨胀
+`;
+      const TEXT_4_BOTH = `推荐的最优选择是：**沃尼察市长**
+理由：他目前没有伯爵领，直接授予他一块伯爵领能大幅提升忠诚，同时兵力较低，对你威胁小，容易控制。
+
+---
+
+### 较优候选封臣
+
+**沃尼察市长**
+
+* 好感：-6（中立，可迅速转为积极）
+* 现状：没有伯爵领
+* 兵力：393，低，不构成威胁
+* 优点：授予后直接升为伯爵，忠诚度提升最显著
+
+**什蒂普市长**
+
+* 好感：89，极高的忠诚度
+* 现状：没有伯爵领
+* 兵力：289，很低，不可能挑战你
+* 优点：几乎忠心耿耿，给他领地非常安全
+* 缺点：提升空间有限，好感度本就高
+
+**埃托利亚伯爵**
+
+* 好感：55，积极
+* 家族：与你同一家族
+* 现状：已有1个伯爵领
+* 兵力：534，中等
+* 优点：家族成员，扩展实力有助于同族势力稳固
+* 缺点：已有领地，给他更多领地可能令其势力过强
+
+**斯科普里伯爵**
+
+* 好感：55，积极
+* 现状：已有2个伯爵领
+* 兵力：976，较强
+* 优点：对你有好感，授予会加深忠诚
+* 缺点：已有过多领地，继续增强可能导致难以控制
+`;
+      const TEXT_1_DATA = `### 候选封臣
+
+**隆佛特市长**
+
+* 好感度：37
+* 拥有的伯爵领数量：0
+* 兵力：69
+* 信仰：海岛基督教
+* 文化：爱尔兰
+* 特质：无领地的小封臣，分封后获得巨大好感提升，实力有限，易于控制。
+
+**卡里格阿尔格什市长**
+
+* 好感度：27
+* 拥有的伯爵领数量：0
+* 兵力：46
+* 信仰：海岛基督教
+* 文化：爱尔兰
+* 特质：与隆佛特类似，弱小且无伯爵领，是可行的受封人选，但好感度偏低。
+
+**奥里尔伯爵**
+
+* 好感度：78
+* 拥有的伯爵领数量：1
+* 兵力：151
+* 信仰：海岛基督教
+* 文化：爱尔兰
+* 特质：属于同一家族，好感基础高，增强亲族封臣的地位有利于内部团结，但已有伯爵领，长期可能变强。
+
+**都夫林伯爵**
+
+* 好感度：71
+* 拥有的伯爵领数量：1
+* 兵力：781
+* 信仰：天主教
+* 文化：爱尔兰
+* 特质：强力封臣，当前好感较高，封地增益会进一步稳固关系，但增强其兵力可能导致未来难以压制`;
+      const TEXT_2_DATA = `### 候选封臣信息
+
+**威斯特摩兰伯爵**
+
+* 好感度：80
+* 同一家族：是
+* 现有伯爵领：1
+* 兵力：98
+* 信仰文化：阿萨神族、诺斯
+* 亮点：忠诚度高且属于家族，最稳妥的分封对象
+
+**蒂维厄特河谷伯爵**
+
+* 好感度：70
+* 同一家族：否
+* 现有伯爵领：2
+* 兵力：155
+* 亮点：对你态度不错，但已有两块伯爵领，再分封可能导致权力过盛
+
+**默恩伯爵**
+
+* 好感度：65
+* 同一家族：否
+* 现有伯爵领：1
+* 兵力：254
+* 亮点：兵力强大，拉拢后能增强你的军事力量，但过于强势可能日后难以制衡
+
+**东赖丁伯爵**
+
+* 好感度：25
+* 同一家族：否
+* 现有伯爵领：1
+* 兵力：234
+* 亮点：兵力强大，分封可显著提升好感度，但目前态度偏冷淡，存在风险`;
+      const TEXT_3_DATA = `### 其他较优候选人
+
+**弗赖辛市长**
+
+* 好感度高达85，容易转化为忠诚伯爵
+* 无伯爵领，分封效用最大
+* 但文化为法兰克尼亚，可能导致轻微的文化摩擦
+
+**因斯布鲁克伯爵**
+
+* 好感度极高，已接近满值
+* 已有1块伯爵领，若再授予容易变得过强
+* 文化相同，整合顺畅，但风险在于强势贵族
+
+**弗龙滕豪森伯爵**
+
+* 属于你的家族，忠诚度较稳固
+* 好感度不错，分封能进一步巩固宗族势力
+* 已有伯爵领，强化他会让家族内部一支势力膨胀`;
+      const TEXT_4_DATA = `### 较优候选封臣
+
+**沃尼察市长**
+
+* 好感：-6（中立，可迅速转为积极）
+* 现状：没有伯爵领
+* 兵力：393，低，不构成威胁
+* 优点：授予后直接升为伯爵，忠诚度提升最显著
+
+**什蒂普市长**
+
+* 好感：89，极高的忠诚度
+* 现状：没有伯爵领
+* 兵力：289，很低，不可能挑战你
+* 优点：几乎忠心耿耿，给他领地非常安全
+* 缺点：提升空间有限，好感度本就高
+
+**埃托利亚伯爵**
+
+* 好感：55，积极
+* 家族：与你同一家族
+* 现状：已有1个伯爵领
+* 兵力：534，中等
+* 优点：家族成员，扩展实力有助于同族势力稳固
+* 缺点：已有领地，给他更多领地可能令其势力过强
+
+**斯科普里伯爵**
+
+* 好感：55，积极
+* 现状：已有2个伯爵领
+* 兵力：976，较强
+* 优点：对你有好感，授予会加深忠诚
+* 缺点：已有过多领地，继续增强可能导致难以控制`;
+      const TEXT_1_SUGGESTION = `推荐的最优选择：**隆佛特市长**
+理由：他没有伯爵领，分封后可直接提升为伯爵，忠诚度将显著提高，同时其当前兵力较低，成为伯爵后难以对国王构成威胁，是最稳妥的封臣扩张对象。`;
+      const TEXT_2_SUGGESTION = `把新的直属伯爵领分封给**威斯特摩兰伯爵**。
+理由：他和你同一家族，忠诚度最高，已经有一定地位但权力不算过大。分封能进一步稳固宗族内部关系，减少潜在内乱的风险。`;
+      const TEXT_3_SUGGESTION = `**推荐分封对象：代根多夫市长**
+理由：他目前没有伯爵领，若分封会直接升格为伯爵，对好感提升极大；他兵力较低，不会形成威胁；信仰和文化与你一致，治理容易。`;
+      const TEXT_4_SUGGESTION = `推荐的最优选择是：**沃尼察市长**
+理由：他目前没有伯爵领，直接授予他一块伯爵领能大幅提升忠诚，同时兵力较低，对你威胁小，容易控制。`;
+
+      function pickBy(modeValue: string | undefined, tierValue: string | undefined): string {
+        switch (modeValue) {
+          case 'DATA':
+            switch (tier) {
+              case '1': return TEXT_1_DATA;
+              case '2': return TEXT_2_DATA;
+              case '3': return TEXT_3_DATA;
+              case '4': return TEXT_4_DATA;
+              default:  return '';
+            }
+          case 'SUGGESTION':
+            switch (tier) {
+              case '1': return TEXT_1_SUGGESTION;
+              case '2': return TEXT_2_SUGGESTION;
+              case '3': return TEXT_3_SUGGESTION;
+              case '4': return TEXT_4_SUGGESTION;
+              default:  return '';
+            }
+          case 'BOTH':
+            switch (tier) {
+              case '1': return TEXT_1_BOTH;
+              case '2': return TEXT_2_BOTH;
+              case '3': return TEXT_3_BOTH;
+              case '4': return TEXT_4_BOTH;
+              default:  return '';
+            }
+          default:
+            return '';
+        }
       }
-      
-      sessions.set(sessionId, result);
 
-      // 取本轮面向用户的答复：优先拿最后一条 name 为 decision_suggestion 的 AIMessage
-      const messages = result.messages || [];
-      const reversed = [...messages].reverse();
-      const finalMsg = (reversed.find((m: any) => m?._getType?.() === 'ai' && (m.name === 'decision_suggestion'))
-        || reversed.find((m: any) => m?._getType?.() === 'ai')) as AIMessage | undefined;
-      
-      console.log(`[chat:send] 找到最终消息:`, { 
-        found: !!finalMsg, 
-        type: finalMsg?._getType?.(), 
-        name: (finalMsg as any)?.name 
-      });
-      
-      const raw = (finalMsg?.content as any);
-      const reply = extractTextFromContent(raw);
-      console.log(`[chat:send] 提取的回复长度: ${reply?.length || 0}`);
-      
+      const reply = pickBy(modeValue as any, tier as any);
       return { reply };
     } catch (error: any) {
-      console.error(`[chat:send] 错误:`, error);
-      console.error(`[chat:send] 错误堆栈:`, error.stack);
       const message = (error && error.message) ? error.message : String(error);
       return { reply: `处理失败：${message}` };
     }

@@ -31,6 +31,17 @@
                 title: 'CK3 助手',
                 content: `
                     <div class="chat-container">
+                        <div class="chat-mode-toggle" id="chatModeToggle" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+                            <button id="modeBoth" class="mode-btn active">BOTH</button>
+                            <button id="modeData" class="mode-btn">DATA</button>
+                            <button id="modeSuggestion" class="mode-btn">SUGGESTION</button>
+                        </div>
+                        <div class="chat-tier-toggle" id="chatTierToggle" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+                            <button id="tier1" class="tier-btn">1</button>
+                            <button id="tier2" class="tier-btn">2</button>
+                            <button id="tier3" class="tier-btn">3</button>
+                            <button id="tier4" class="tier-btn">4</button>
+                        </div>
                         <div class="chat-messages" id="chatMessages">
                             <div class="message assistant-message">
                                 <div class="message-content">
@@ -40,7 +51,7 @@
                         </div>
                         <div class="chat-input-container">
                             <div class="input-wrapper">
-                                <input type="text" id="chatInput" placeholder="请输入消息..." class="chat-input" />
+                                <div id="fixedText" class="chat-fixed-text">我现在在考虑将直辖领地转移到封臣手中，请帮我分析利弊</div>
                                 <button id="sendButton" class="send-button">发送</button>
                             </div>
                         </div>
@@ -56,7 +67,9 @@
                             await window.electronAPI.chat.newSession(sessionId);
                             window.__ck3_session_inited[sessionId] = true;
                         }
-                        const { reply } = await window.electronAPI.chat.send(sessionId, message);
+                        const mode = (fw && typeof fw.getReplyMode === 'function') ? fw.getReplyMode() : 'BOTH';
+                        const tier = (fw && typeof fw.getReplyTier === 'function') ? fw.getReplyTier() : undefined;
+                        const { reply } = await window.electronAPI.chat.send(sessionId, message, mode, tier);
                         // 支持JSON字符串或对象的安全解析，优先中文
                         try {
                             const parsed = typeof reply === 'string' ? JSON.parse(reply) : reply;
